@@ -1,8 +1,15 @@
-# Use official Python base image
+# Use official Python image
 FROM python:3.10-slim
 
-# ✅ Fix for OpenCV/libGL.so.1
-RUN apt-get update && apt-get install -y libgl1-mesa-glx
+# ✅ Install OpenCV-related system dependencies
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxrender1 \
+    libxext6 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
@@ -10,12 +17,12 @@ WORKDIR /app
 # Copy project files
 COPY . .
 
-# Install dependencies
+# Install Python dependencies
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
-# Expose port 8080 for Cloud Run / Render
+# Expose the port used by the app
 EXPOSE 8080
 
-# Start FastAPI app
+# Start the FastAPI app
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8080"]
