@@ -1,21 +1,48 @@
-from fastapi import APIRouter, File, UploadFile
-import pandas as pd
+from fastapi import APIRouter
+from pydantic import BaseModel
 import joblib
-import tempfile
+from lime.lime_tabular import LimeTabularExplainer
+import numpy as np
 
 router = APIRouter()
 
 # Load model
 model = joblib.load("models/fraud_model.pkl")
 
-@router.post("/predict_fraud")
-async def predict_fraud(file: UploadFile = File(...)):
-    contents = await file.read()
-    
-    with tempfile.NamedTemporaryFile(delete=False) as tmp:
-        tmp.write(contents)
-        tmp_path = tmp.name
+# ✅ Correct feature names from your fraud_cleaned.csv
+feature_names = [
+    "Time", "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8",
+    "V9", "V10", "V11", "V12", "V13", "V14", "V15", "V16",
+    "V17", "V18", "V19", "V20", "V21", "V22", "V23", "V24",
+    "V25", "V26", "V27", "V28", "Amount"
+]
 
-    df = pd.read_csv(tmp_path)
-    preds = model.predict(df)
-    return {"predictions": preds.tolist()}
+class FraudInput(BaseModel):
+    features: list
+
+@router.post("/predict_fraud")
+async def predict_fraud(data: FraudInput):
+    input_array = np.array(data.features).reshape(1, -1)
+
+    # Predict
+    prediction = model.predict(input_array)[0]
+
+    # LIME explainability
+    explainer = LimeTabularExplainer(
+        training_data=np.zeros((1, len(feature_names))),  # Dummy zeros
+        feature_names=feature_names,
+        class_names=["Non-Fraud", "Fraud"],
+        mode="classification"
+    )
+
+    exp = explainer.explain_instance(
+        data_row=input_array[0],
+        predict_fn=lambda x: model.predict_proba(x)
+    )
+
+    important_features = [feature for feature, weight in exp.as_list()][:5]
+
+    return {
+        "prediction": int(prediction),
+        "explanation": important_features
+    }
