@@ -9,7 +9,7 @@ router = APIRouter()
 # Load model
 model = joblib.load("models/fraud_model.pkl")
 
-# ✅ Correct feature names from your fraud_cleaned.csv
+# Correct feature names (30 columns)
 feature_names = [
     "Time", "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8",
     "V9", "V10", "V11", "V12", "V13", "V14", "V15", "V16",
@@ -24,12 +24,16 @@ class FraudInput(BaseModel):
 async def predict_fraud(data: FraudInput):
     input_array = np.array(data.features).reshape(1, -1)
 
-    # Predict
+    # ✨ Validate input
+    if input_array.shape[1] != 30:
+        return {"error": f"Expected 30 features, but got {input_array.shape[1]}"}
+
+    # ✅ Predict
     prediction = model.predict(input_array)[0]
 
-    # LIME explainability
+    # ✅ LIME Explainability
     explainer = LimeTabularExplainer(
-        training_data=np.zeros((1, len(feature_names))),  # Dummy zeros
+        training_data=np.zeros((1, len(feature_names))),
         feature_names=feature_names,
         class_names=["Non-Fraud", "Fraud"],
         mode="classification"
